@@ -19,17 +19,6 @@ export function UserMenu() {
   const { user, isAuthenticated, signOut } = useAuth()
   const [showAuthDialog, setShowAuthDialog] = useState(false)
 
-  if (!isAuthenticated) {
-    return (
-      <>
-        <Button onClick={() => setShowAuthDialog(true)} variant="outline" size="sm">
-          Sign In
-        </Button>
-        <AuthDialog open={showAuthDialog} onOpenChange={setShowAuthDialog} />
-      </>
-    )
-  }
-
   const handleSignOut = async () => {
     await signOut()
   }

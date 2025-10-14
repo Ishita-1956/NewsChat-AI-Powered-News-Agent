@@ -1,46 +1,51 @@
-"use client"
-
-import { useState, useEffect } from "react"
-import { AuthService, type AuthState, type User } from "@/lib/auth"
+// hooks/use-auth.ts
+"use client";
+import { useState } from "react";
+import { auth } from "@/lib/firebase";
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, User } from "firebase/auth";
+import { useRouter } from "next/navigation";
 
 export function useAuth() {
-  const [authState, setAuthState] = useState<AuthState>({
-    user: null,
-    isLoading: true,
-    isAuthenticated: false,
-  })
+  const [user, setUser] = useState<User | null>(auth.currentUser);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
-  useEffect(() => {
-    const authService = AuthService.getInstance()
-    const unsubscribe = authService.subscribe(setAuthState)
-    return unsubscribe
-  }, [])
-
-  const signUp = async (email: string, password: string, name: string) => {
-    const authService = AuthService.getInstance()
-    return authService.signUp(email, password, name)
-  }
+  const signUp = async (email: string, password: string, name?: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await createUserWithEmailAndPassword(auth, email, password);
+      setUser(res.user);
+      return { success: true };
+    } catch (err: any) {
+      setError(err.message);
+      return { success: false, error: err.message };
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const signIn = async (email: string, password: string) => {
-    const authService = AuthService.getInstance()
-    return authService.signIn(email, password)
-  }
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await signInWithEmailAndPassword(auth, email, password);
+      setUser(res.user);
+      return { success: true };
+    } catch (err: any) {
+      setError(err.message);
+      return { success: false, error: err.message };
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const signOut = async () => {
-    const authService = AuthService.getInstance()
-    return authService.signOut()
-  }
+  const signOutUser = async () => {
+    await signOut(auth);
+    setUser(null);
+    router.push("/");
+  };
 
-  const updateProfile = async (updates: Partial<Pick<User, "name" | "avatar">>) => {
-    const authService = AuthService.getInstance()
-    return authService.updateProfile(updates)
-  }
-
-  return {
-    ...authState,
-    signUp,
-    signIn,
-    signOut,
-    updateProfile,
-  }
+  return { user, loading, error, signUp, signIn, signOutUser };
 }
