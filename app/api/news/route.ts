@@ -1,154 +1,140 @@
-import { type NextRequest, NextResponse } from "next/server"
+// app/api/news/route.ts
+import { NextRequest, NextResponse } from "next/server"
 
-interface NewsAPIResponse {
-  status: string
-  totalResults: number
-  articles: Array<{
-    source: { id: string | null; name: string }
-    author: string | null
-    title: string
-    description: string | null
-    url: string
-    urlToImage: string | null
-    publishedAt: string
-    content: string | null
-  }>
-}
+const NEWS_API_KEY = process.env.NEWS_API_KEY
+const NEWS_API_BASE_URL = "https://newsapi.org/v2"
+
+// Map of supported countries for NewsAPI top-headlines endpoint
+const SUPPORTED_COUNTRIES = new Set([
+  'ae', 'ar', 'at', 'au', 'be', 'bg', 'br', 'ca', 'ch', 'cn', 'co', 'cu', 
+  'cz', 'de', 'eg', 'fr', 'gb', 'gr', 'hk', 'hu', 'id', 'ie', 'il', 'in', 
+  'it', 'jp', 'kr', 'lt', 'lv', 'ma', 'mx', 'my', 'ng', 'nl', 'no', 'nz', 
+  'ph', 'pl', 'pt', 'ro', 'rs', 'ru', 'sa', 'se', 'sg', 'si', 'sk', 'th', 
+  'tr', 'tw', 'ua', 'us', 've', 'za'
+])
 
 export async function GET(request: NextRequest) {
-  const searchParams = request.nextUrl.searchParams
-  const category = searchParams.get("category") || "general"
-  const country = searchParams.get("country") || "us"
-  const sortBy = searchParams.get("sortBy") || "publishedAt"
-  const q = searchParams.get("q") // For search queries
-  const from = searchParams.get("from") // Date filtering
-  const to = searchParams.get("to") // Date filtering
-  const location = searchParams.get("location") // Location-based search
-
-  const apiKey = process.env.NEWS_API_KEY
-
-  console.log("[v0] News API called with params:", { category, country, sortBy, q, from, to, location })
-  console.log("[v0] NEWS_API_KEY configured:", !!apiKey)
-
-  if (!apiKey) {
-    console.error("[v0] NEWS_API_KEY is missing from environment variables")
+  if (!NEWS_API_KEY) {
     return NextResponse.json(
-      {
-        error: "NEWS_API_KEY is not configured. Please add your NewsAPI key to environment variables.",
-        articles: [], // Return empty array so chat doesn't break
-      },
-      { status: 500 },
+      { error: "NEWS_API_KEY is not configured. Please add it to your environment variables." },
+      { status: 500 }
     )
   }
 
+  const searchParams = request.nextUrl.searchParams
+  const country = searchParams.get("country") || "us"
+  const category = searchParams.get("category") || ""
+  const sortBy = searchParams.get("sortBy") || "publishedAt"
+  const pageSize = searchParams.get("pageSize") || "100"
+
   try {
-    let url = "https://newsapi.org/v2/"
-    const params = new URLSearchParams({
-      apiKey,
-      pageSize: "20",
-      sortBy,
-    })
-
-    if (q || location || from || to) {
-      url += "everything"
-
-      if (q) {
-        params.append("q", q)
-      }
-
-      if (location) {
-        const locationQuery = q ? `${q} AND ${location}` : location
-        params.set("q", locationQuery)
-      }
-
-      if (from) {
-        params.append("from", from)
-      }
-
-      if (to) {
-        params.append("to", to)
-      }
-
-      params.append("language", "en")
-      params.append("sortBy", "publishedAt")
-    } else {
-      url += "top-headlines"
-      if (category !== "all") {
-        params.append("category", category)
-      }
-      params.append("country", country)
+    const countryCode = country.toLowerCase()
+    
+    // Check if country is supported
+    if (!SUPPORTED_COUNTRIES.has(countryCode)) {
+      console.warn(`⚠️ Country "${countryCode}" not supported by NewsAPI`)
+      return NextResponse.json({
+        error: `Country "${country}" is not supported. Please select a different region.`,
+        articles: [],
+        totalResults: 0
+      }, { status: 400 })
     }
 
-    const fullUrl = `${url}?${params}`
-    console.log("[v0] Making NewsAPI request to:", fullUrl)
-
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
-
-    const response = await fetch(fullUrl, {
-      headers: {
-        "User-Agent": "NewsChat/1.0",
-      },
-      signal: controller.signal,
+    // Build params object
+    const params = new URLSearchParams({
+      apiKey: NEWS_API_KEY,
+      pageSize: pageSize,
     })
 
-    clearTimeout(timeoutId)
+    // Always add country parameter
+    params.append("country", countryCode)
 
-    console.log("[v0] NewsAPI response status:", response.status)
+    // Add category if provided and not "general" or "all"
+    if (category && category !== "general" && category !== "all") {
+      params.append("category", category)
+    }
+
+    const url = `${NEWS_API_BASE_URL}/top-headlines?${params.toString()}`
+    
+    console.log("📡 Fetching news:", {
+      country: countryCode,
+      category: category || "all",
+      sortBy: sortBy,
+      url: url.replace(NEWS_API_KEY, "***")
+    })
+    
+    const response = await fetch(url, {
+      headers: {
+        "Content-Type": "application/json",
+      },
+      next: { revalidate: 300 }, // Cache for 5 minutes
+    })
 
     if (!response.ok) {
-      const errorText = await response.text()
-      console.error("[v0] NewsAPI error response:", errorText)
-      throw new Error(`NewsAPI error: ${response.status} - ${errorText}`)
-    }
-
-    const data: NewsAPIResponse = await response.json()
-    console.log("[v0] NewsAPI returned:", data.totalResults, "articles")
-
-    const filteredArticles = data.articles
-      .filter(
-        (article) =>
-          article.title &&
-          article.description &&
-          article.url &&
-          !article.title.includes("[Removed]") &&
-          !article.description.includes("[Removed]") &&
-          article.title.length > 10,
+      const errorData = await response.json()
+      console.error("❌ NewsAPI error:", errorData)
+      return NextResponse.json(
+        { 
+          error: errorData.message || "Failed to fetch news from NewsAPI",
+          articles: [],
+          totalResults: 0
+        },
+        { status: response.status }
       )
-      .map((article) => ({
-        ...article,
-        publishedAt: new Date(article.publishedAt).toLocaleDateString("en-US", {
-          year: "numeric",
-          month: "long",
-          day: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-        description: article.description?.substring(0, 200) + (article.description?.length > 200 ? "..." : ""),
-      }))
-
-    console.log("[v0] Filtered articles count:", filteredArticles.length)
-
-    const headers = {
-      "Cache-Control": "public, max-age=3600, stale-while-revalidate=86400", // 1 hour cache, 24 hour stale
     }
 
-    return NextResponse.json(
-      {
-        status: data.status,
-        totalResults: data.totalResults,
-        articles: filteredArticles,
-      },
-      { headers },
+    const data = await response.json()
+
+    // Filter out articles with [Removed] content
+    let articles = (data.articles || []).filter(
+      (article: any) => 
+        article.title !== "[Removed]" && 
+        article.description !== "[Removed]" &&
+        article.title &&
+        article.description
     )
+
+    // Handle client-side sorting
+    if (sortBy === "popularity" && articles.length > 0) {
+      // Sort by source name and author presence
+      articles.sort((a: any, b: any) => {
+        const aScore = (a.author ? 1 : 0) + (a.source?.name ? 1 : 0)
+        const bScore = (b.author ? 1 : 0) + (b.source?.name ? 1 : 0)
+        return bScore - aScore
+      })
+    } else if (sortBy === "relevancy" && articles.length > 0) {
+      // Keep API order (already relevant)
+    } else if (sortBy === "publishedAt" && articles.length > 0) {
+      // Sort by date (most recent first)
+      articles.sort((a: any, b: any) => {
+        return new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
+      })
+    }
+
+    if (articles.length === 0) {
+      console.warn(`⚠️ No articles found for ${countryCode.toUpperCase()} - ${category || 'all categories'}`)
+      return NextResponse.json({
+        articles: [],
+        totalResults: 0,
+        error: `No articles available for ${country.toUpperCase()} in this category. Try a different region or category.`
+      })
+    }
+
+    console.log(`✅ Successfully fetched ${articles.length} articles for ${countryCode.toUpperCase()}`)
+
+    return NextResponse.json({
+      articles: articles,
+      totalResults: articles.length,
+    })
   } catch (error) {
-    console.error("[v0] News API error:", error)
+    console.error("❌ Error fetching news:", error)
     return NextResponse.json(
-      {
-        error: "Failed to fetch news articles",
-        articles: [], // Return empty array so chat doesn't break
+      { 
+        error: "An error occurred while fetching news",
+        articles: [],
+        totalResults: 0
       },
-      { status: 500 },
+      { status: 500 }
     )
   }
 }

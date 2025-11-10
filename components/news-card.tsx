@@ -1,10 +1,10 @@
 "use client"
 
 import { useState } from "react"
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ExternalLink, Bookmark, Sparkles, Loader2 } from "lucide-react"
+import { ExternalLink, Bookmark, Sparkles, Loader2, ChevronDown, ChevronUp } from "lucide-react"
 import Image from "next/image"
 import { summarizeArticle, type Article } from "@/lib/news-api"
 import { useSavedArticles } from "@/hooks/use-saved-articles"
@@ -16,33 +16,30 @@ interface NewsCardProps {
 export function NewsCard({ article }: NewsCardProps) {
   const [summary, setSummary] = useState<string | null>(null)
   const [loadingSummary, setLoadingSummary] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(false)
   const { saveArticle, unsaveArticle, isArticleSaved } = useSavedArticles()
 
   const isSaved = isArticleSaved(article.url)
 
-  const formatDate = (dateString) => {
-  // First, check if the dateString is valid
-  if (!dateString) {
-    return "Date not available";
+  const formatDate = (dateString: string) => {
+    if (!dateString) {
+      return "Date not available"
+    }
+
+    const date = new Date(dateString)
+
+    if (isNaN(date.getTime())) {
+      console.error("Invalid date string:", dateString)
+      return dateString
+    }
+
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
   }
-
-  const date = new Date(dateString);
-
-  // Check if the date object is valid
-  if (isNaN(date.getTime())) {
-    // If invalid, return a placeholder or the original string
-    console.error("Invalid date string:", dateString);
-    return dateString; // Fallback to showing the raw string
-  }
-
-  // If valid, format the date as before
-  return date.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-};
 
   const handleSave = () => {
     if (isSaved) {
@@ -63,75 +60,157 @@ export function NewsCard({ article }: NewsCardProps) {
       const content = article.content || article.description || ""
       const generatedSummary = await summarizeArticle(article.title, content)
       setSummary(generatedSummary)
+      setIsExpanded(true)
     } catch (error) {
       setSummary("Failed to generate summary. Please try again.")
+      setIsExpanded(true)
     } finally {
       setLoadingSummary(false)
     }
   }
 
+  const toggleExpand = () => {
+    setIsExpanded(!isExpanded)
+  }
+
   return (
-    <Card className="h-full flex flex-col bg-card hover:shadow-lg transition-shadow duration-200">
-      <CardHeader className="p-0">
-        <div className="relative h-48 w-full">
-          <Image
-            src={article.urlToImage || "/placeholder.svg?height=200&width=400&text=News"}
-            alt={article.title}
-            fill
-            className="object-cover rounded-t-lg"
-            onError={(e) => {
-              const target = e.target as HTMLImageElement
-              target.src = "/placeholder.svg?height=200&width=400&text=News"
-            }}
-          />
-          <div className="absolute top-2 right-2">
-            <Badge variant="secondary" className="bg-background/80 text-foreground">
-              {article.source.name}
-            </Badge>
+    <Card className="w-full bg-card hover:shadow-md transition-shadow duration-200 overflow-hidden">
+      <CardContent className="p-4">
+        {/* Main Content Row */}
+        <div className="flex gap-4">
+          {/* Text Content */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-3 mb-2">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-2">
+                  <Badge variant="secondary" className="text-xs">
+                    {article.source.name}
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">
+                    {formatDate(article.publishedAt)}
+                  </span>
+                </div>
+                <h3 className="font-semibold text-lg text-card-foreground mb-2 line-clamp-2">
+                  {article.title}
+                </h3>
+                <p className="text-sm text-muted-foreground line-clamp-2">
+                  {article.description}
+                </p>
+              </div>
+              
+              {/* Image Thumbnail */}
+              <div className="relative w-32 h-24 flex-shrink-0 rounded-md overflow-hidden bg-muted">
+                <Image
+                  src={article.urlToImage || "/placeholder.svg?height=96&width=128&text=News"}
+                  alt={article.title}
+                  fill
+                  className="object-cover"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement
+                    target.src = "/placeholder.svg?height=96&width=128&text=News"
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2 mt-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.open(article.url, "_blank")}
+              >
+                <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+                Read More
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleSummarize}
+                disabled={loadingSummary}
+              >
+                {loadingSummary ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <>
+                    <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                    AI Summary
+                  </>
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleSave}
+                className={isSaved ? "text-primary" : ""}
+              >
+                <Bookmark className={`h-3.5 w-3.5 ${isSaved ? "fill-current" : ""}`} />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={toggleExpand}
+                className="ml-auto"
+              >
+                {isExpanded ? (
+                  <>
+                    <ChevronUp className="h-4 w-4 mr-1" />
+                    Less
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown className="h-4 w-4 mr-1" />
+                    More
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         </div>
-      </CardHeader>
 
-      <CardContent className="flex-1 p-4">
-        <h3 className="font-semibold text-card-foreground mb-2 line-clamp-2 text-balance">{article.title}</h3>
-        <p className="text-lg text-muted-foreground mb-3 line-clamp-3">{article.description}</p>
-        <p className="text-sm text-muted-foreground">{formatDate(article.publishedAt)}</p>
-
-        {(summary || loadingSummary) && (
-          <div className="mt-3 p-3 bg-muted rounded-lg">
-            <div className="flex items-center gap-2 mb-2">
-              <Sparkles className="h-4 w-4 text-primary" />
-              <span className="text-xl font-medium">AI Summary</span>
-            </div>
-            {loadingSummary ? (
-              <div className="flex items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span className="text-xl text-muted-foreground">Generating summary...</span>
+        {/* Expanded Content */}
+        {isExpanded && (
+          <div className="mt-4 pt-4 border-t border-border">
+            {/* Full Description */}
+            {article.description && (
+              <div className="mb-3">
+                <p className="text-sm text-muted-foreground">
+                  {article.description}
+                </p>
               </div>
-            ) : (
-              <p className="text-xl text-muted-foreground">{summary}</p>
+            )}
+
+            {/* Author Info */}
+            {article.author && (
+              <div className="mb-3">
+                <p className="text-xs text-muted-foreground">
+                  By {article.author}
+                </p>
+              </div>
+            )}
+
+            {/* AI Summary Section */}
+            {(summary || loadingSummary) && (
+              <div className="p-3 bg-muted rounded-lg">
+                <div className="flex items-center gap-2 mb-2">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-medium">AI Summary</span>
+                </div>
+                {loadingSummary ? (
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span className="text-sm text-muted-foreground">
+                      Generating summary...
+                    </span>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">{summary}</p>
+                )}
+              </div>
             )}
           </div>
         )}
       </CardContent>
-
-      <CardFooter className="p-4 pt-0 flex gap-2">
-        <Button
-          variant="outline"
-          size="lg"
-          className="flex-1 bg-transparent"
-          onClick={() => window.open(article.url, "_blank")}
-        >
-          <ExternalLink className="h-4 w-4 mr-2" />
-          Read More
-        </Button>
-        <Button variant="outline" size="lg" onClick={handleSummarize} disabled={loadingSummary}>
-          {loadingSummary ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-        </Button>
-        <Button variant="outline" size="lg" onClick={handleSave} className={isSaved ? "text-primary" : ""}>
-          <Bookmark className={`h-4 w-4 ${isSaved ? "fill-current" : ""}`} />
-        </Button>
-      </CardFooter>
     </Card>
   )
 }

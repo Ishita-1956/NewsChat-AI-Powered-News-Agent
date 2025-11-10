@@ -11,16 +11,15 @@ import { SettingsSection } from "@/components/settings-section"
 
 export default function HomePage() {
   const [activeSection, setActiveSection] = useState("discover")
-  const [activeCategory, setActiveCategory] = useState("all")
-  const [region, setRegion] = useState("global")
-  const [sortBy, setSortBy] = useState("publishedAt")
+  const [activeCategory, setActiveCategory] = useState("general")
 
   const renderMainContent = () => {
     switch (activeSection) {
       case "chat":
         return <ChatSection />
       case "discover":
-        return <NewsSection category={activeCategory} region={region} sortBy={sortBy} />
+        // Always show US news with publishedAt sorting
+        return <NewsSection category={activeCategory} region="us" sortBy="publishedAt" />
       case "saved":
         return <SavedSection />
       case "notifications":
@@ -28,7 +27,7 @@ export default function HomePage() {
       case "settings":
         return <SettingsSection />
       default:
-        return <NewsSection category={activeCategory} region={region} sortBy={sortBy} />
+        return <NewsSection category={activeCategory} region="us" sortBy="publishedAt" />
     }
   }
 
@@ -41,10 +40,6 @@ export default function HomePage() {
           <TopFilterBar
             activeCategory={activeCategory}
             onCategoryChange={setActiveCategory}
-            region={region}
-            onRegionChange={setRegion}
-            sortBy={sortBy}
-            onSortChange={setSortBy}
           />
         )}
 

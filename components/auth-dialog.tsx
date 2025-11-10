@@ -41,6 +41,43 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
     }, 4000);
   };
 
+  // Load user settings and apply theme
+  const loadUserSettings = (userEmail: string) => {
+    const storageKey = `newsChat-settings-${userEmail}`;
+    const stored = localStorage.getItem(storageKey);
+    
+    if (stored) {
+      try {
+        const settings = JSON.parse(stored);
+        // Apply theme immediately
+        if (settings.theme === 'dark') {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+      } catch (e) {
+        console.error('Failed to parse settings:', e);
+        // Default to light theme
+        document.documentElement.classList.remove('dark');
+      }
+    } else {
+      // Default to light theme for new users
+      document.documentElement.classList.remove('dark');
+    }
+  };
+
+  // Handle successful login
+  const handleSuccessfulLogin = (userEmail: string) => {
+    // Store user email in sessionStorage
+    sessionStorage.setItem('newsChat-userEmail', userEmail);
+    
+    // Load and apply user's theme settings
+    loadUserSettings(userEmail);
+    
+    // Dispatch custom event to notify components
+    window.dispatchEvent(new Event('authStateChanged'));
+  };
+
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -65,7 +102,7 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
         const firebaseAuth = await import('firebase/auth');
         const { auth } = await import('@/lib/firebase');
         
-        await firebaseAuth.createUserWithEmailAndPassword(auth, email, password);
+        const result = await firebaseAuth.createUserWithEmailAndPassword(auth, email, password);
 
         setEmail('');
         setPassword('');
@@ -84,7 +121,10 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
         const firebaseAuth = await import('firebase/auth');
         const { auth } = await import('@/lib/firebase');
         
-        await firebaseAuth.signInWithEmailAndPassword(auth, email, password);
+        const result = await firebaseAuth.signInWithEmailAndPassword(auth, email, password);
+
+        // Handle successful login
+        handleSuccessfulLogin(result.user.email!);
 
         setEmail('');
         setPassword('');
@@ -129,7 +169,10 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
       const { auth } = await import('@/lib/firebase');
       
       const provider = new firebaseAuth.GoogleAuthProvider();
-      await firebaseAuth.signInWithPopup(auth, provider);
+      const result = await firebaseAuth.signInWithPopup(auth, provider);
+
+      // Handle successful login
+      handleSuccessfulLogin(result.user.email!);
 
       onOpenChange(false);
 

@@ -22,6 +22,8 @@ export function NewsSection({ category, region, sortBy }: NewsSectionProps) {
     setLoading(true)
     setError(null)
 
+    console.log("Loading US news with category:", category)
+
     try {
       const response = await fetchNews(category, region, sortBy)
 
@@ -30,8 +32,14 @@ export function NewsSection({ category, region, sortBy }: NewsSectionProps) {
         setArticles([])
       } else {
         setArticles(response.articles)
+        console.log(`✅ Loaded ${response.articles.length} articles`)
+        
+        if (response.articles.length === 0) {
+          setError("No articles found for this category. Try a different category.")
+        }
       }
     } catch (err) {
+      console.error("Error loading news:", err)
       setError("Failed to load news articles")
       setArticles([])
     } finally {
@@ -73,7 +81,7 @@ export function NewsSection({ category, region, sortBy }: NewsSectionProps) {
                 <p>
                   <strong>To enable real news data:</strong>
                 </p>
-                <ol className="list-decimal list-inside space-y-1 text-xl">
+                <ol className="list-decimal list-inside space-y-1 text-sm">
                   <li>
                     Get a free API key from{" "}
                     <a
@@ -108,7 +116,9 @@ export function NewsSection({ category, region, sortBy }: NewsSectionProps) {
         <div className="flex items-center gap-2">
           <TrendingUp className="h-6 w-6 text-primary" />
           <h2 className="text-2xl font-bold text-foreground">
-            {category === "all" ? "Top Headlines" : `${category.charAt(0).toUpperCase() + category.slice(1)} News`}
+            {category === "general" || category === "all" 
+              ? "Top Headlines" 
+              : `${category.charAt(0).toUpperCase() + category.slice(1)} News - United States`}
           </h2>
         </div>
         <Button variant="outline" size="sm" onClick={loadNews}>
@@ -119,10 +129,10 @@ export function NewsSection({ category, region, sortBy }: NewsSectionProps) {
 
       {articles.length === 0 ? (
         <div className="text-center py-12">
-          <p className="text-muted-foreground">No articles found for the current filters.</p>
+          <p className="text-muted-foreground">No articles found for this category.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div className="flex flex-col gap-4">
           {articles.map((article, index) => (
             <NewsCard key={`${article.url}-${index}`} article={article} />
           ))}

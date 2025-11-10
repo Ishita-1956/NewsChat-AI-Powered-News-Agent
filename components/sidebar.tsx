@@ -30,18 +30,11 @@ export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
   // Load user name and saved articles count from localStorage
   useEffect(() => {
     const loadUserData = () => {
-      // Load user name
-      const savedSettings = localStorage.getItem('newsChat-settings')
-      if (savedSettings) {
-        try {
-          const parsed = JSON.parse(savedSettings)
-          setUserName(parsed.name || "")
-        } catch (e) {
-          console.error("Failed to load user name:", e)
-        }
+      const savedName = localStorage.getItem('newsChat-displayName')
+      if (savedName) {
+        setUserName(savedName)
       }
 
-      // Load saved articles count
       const savedArticles = localStorage.getItem('newsChat-saved-articles')
       if (savedArticles) {
         try {
@@ -54,8 +47,6 @@ export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
     }
 
     loadUserData()
-
-    // Listen for storage changes and custom events
     const handleStorageChange = () => loadUserData()
 
     window.addEventListener('storage', handleStorageChange)
@@ -67,30 +58,45 @@ export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
     }
   }, [])
 
-  // ✅ Modified Sign Out — no confirmation popup
-  const handleSignOut = async () => {
+  // 🔹 Modern Logout Function (with Firebase + Toast)
+  const handleLogout = async () => {
     try {
-      // Try to sign out from Firebase if available
-      if (typeof window !== 'undefined') {
-        const authModule = await import('@/lib/firebase').catch(() => null)
-        const firebaseAuthModule = await import('firebase/auth').catch(() => null)
+      const firebaseAuth = await import('firebase/auth')
+      const { auth } = await import('@/lib/firebase')
 
-        if (authModule && firebaseAuthModule && authModule.auth) {
-          await firebaseAuthModule.signOut(authModule.auth)
-        }
-      }
+      await firebaseAuth.signOut(auth)
+
+      // Clear user email from sessionStorage
+      sessionStorage.removeItem('newsChat-userEmail')
+
+      // Reset theme to default (light mode)
+      document.documentElement.classList.remove('dark')
+
+      // Dispatch event to notify components
+      window.dispatchEvent(new Event('authStateChanged'))
+
+      // Success popup
+      const toast = document.createElement('div')
+      toast.className = 'fixed top-4 right-4 bg-green-600 text-white px-6 py-4 rounded-lg shadow-lg z-50 animate-in slide-in-from-top-2 duration-300'
+      toast.innerHTML = `
+        <div class="font-semibold mb-1">Signed Out</div>
+        <div class="text-sm opacity-90">You have been signed out successfully</div>
+      `
+      document.body.appendChild(toast)
+
+      setTimeout(() => {
+        toast.classList.add('animate-out', 'slide-out-to-top-2')
+        setTimeout(() => toast.remove(), 300)
+      }, 3000)
+
+      // Redirect to home
+      setTimeout(() => {
+        window.location.href = '/'
+      }, 500)
+
     } catch (error) {
-      console.error("Firebase sign out error:", error)
+      console.error('Logout error:', error)
     }
-
-    // Clear all user data from localStorage
-    localStorage.removeItem('newsChat-settings')
-    localStorage.removeItem('newsChat-saved-articles')
-    localStorage.removeItem('newsChat-cache')
-    localStorage.removeItem('newsChat-theme')
-
-    // Redirect to landing page
-    window.location.href = "/"
   }
 
   // Get initials from name
@@ -102,10 +108,9 @@ export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
       : (words[0].charAt(0) + words[words.length - 1].charAt(0)).toUpperCase()
   }
 
-  // Generate avatar color based on name
+  // Generate avatar color
   const getAvatarColor = (name: string) => {
     if (!name) return "bg-gradient-to-br from-blue-500 to-blue-600"
-
     const colors = [
       "bg-gradient-to-br from-blue-500 to-blue-600",
       "bg-gradient-to-br from-purple-500 to-purple-600",
@@ -116,7 +121,6 @@ export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
       "bg-gradient-to-br from-teal-500 to-teal-600",
       "bg-gradient-to-br from-red-500 to-red-600",
     ]
-
     const index = name.charCodeAt(0) % colors.length
     return colors[index]
   }
@@ -148,10 +152,9 @@ export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
               <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
                 <MessageCircle className="h-5 w-5 text-primary-foreground" />
               </div>
-              <span className="text-2xl font-bold text-sidebar-foreground">NewsChat</span>
+              <span className="text-lg font-bold text-sidebar-foreground">NewsChat</span>
             </div>
 
-            {/* User Avatar */}
             <div
               className={cn(
                 "h-10 w-10 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-md cursor-pointer hover:scale-105 transition-transform",
@@ -175,7 +178,7 @@ export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
                     <Button
                       variant={isActive ? "secondary" : "ghost"}
                       className={cn(
-                        "w-full justify-start gap-3 h-11",
+                        "w-full justify-start gap-3 h-11 text-sm",
                         isActive && "bg-sidebar-primary text-sidebar-primary-foreground",
                       )}
                       onClick={() => {
@@ -184,9 +187,9 @@ export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
                       }}
                     >
                       <Icon className="h-5 w-5" />
-                      <span className="flex-1 text-left text-lg">{item.label}</span>
+                      <span className="flex-1 text-left">{item.label}</span>
                       {item.showBadge && savedCount > 0 && (
-                        <Badge variant="secondary" className="ml-auto">
+                        <Badge variant="secondary" className="ml-auto text-xs">
                           {savedCount}
                         </Badge>
                       )}
@@ -197,15 +200,15 @@ export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
             </ul>
           </nav>
 
-          {/* Sign Out Button */}
+          {/* 🔸 Sign Out Button */}
           <div className="px-4 py-4 border-t border-sidebar-border">
             <Button
               variant="ghost"
-              className="w-full justify-start gap-3 h-11 text-destructive hover:text-destructive hover:bg-destructive/10"
-              onClick={handleSignOut}
+              className="w-full justify-start gap-3 h-11 text-sm text-destructive hover:text-destructive hover:bg-destructive/10"
+              onClick={handleLogout}
             >
               <LogOut className="h-5 w-5" />
-              <span className="flex-1 text-left text-lg">Sign Out</span>
+              <span className="flex-1 text-left">Sign Out</span>
             </Button>
           </div>
         </div>

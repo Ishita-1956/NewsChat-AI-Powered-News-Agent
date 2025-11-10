@@ -5,7 +5,7 @@ import { GeistMono } from "geist/font/mono"
 import { Analytics } from "@vercel/analytics/next"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Suspense } from "react"
-import { Toaster } from "@/components/ui/toaster"  // ✅ Import Toaster
+import { Toaster } from "@/components/ui/toaster"
 import "./globals.css"
 
 export const metadata: Metadata = {
@@ -20,14 +20,23 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
-      <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`}>
+    <html lang="en" suppressHydrationWarning>
+      <body 
+        className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`}
+        suppressHydrationWarning
+      >
         <Suspense fallback={null}>
-          <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+          <ThemeProvider 
+            attribute="class" 
+            defaultTheme="system" 
+            enableSystem
+            disableTransitionOnChange
+            storageKey="newsChat-theme"
+          >
             {children}
           </ThemeProvider>
         </Suspense>
-        <Toaster /> {/* ✅ Toast popup visible at bottom-right */}
+        <Toaster />
         <Analytics />
       </body>
     </html>
