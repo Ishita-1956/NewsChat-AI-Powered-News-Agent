@@ -121,7 +121,7 @@ export default function LandingPage() {
                         id="dropdown-name" 
                         required 
                         placeholder="Your name"
-                        style={{ fontSize: '13px' }}
+                        style={{ fontSize: '13px', color: 'black' }}
                         value={dropdownFormData.name}
                         onChange={(e) => setDropdownFormData({ ...dropdownFormData, name: e.target.value })}
                       />
@@ -133,7 +133,7 @@ export default function LandingPage() {
                         id="dropdown-email" 
                         required 
                         placeholder="your.email@example.com"
-                        style={{ fontSize: '13px' }}
+                        style={{ fontSize: '13px', color: 'black' }}
                         value={dropdownFormData.email}
                         onChange={(e) => setDropdownFormData({ ...dropdownFormData, email: e.target.value })}
                       />
@@ -144,7 +144,7 @@ export default function LandingPage() {
                         id="dropdown-message" 
                         required 
                         placeholder="How can we help?"
-                        style={{ fontSize: '13px' }}
+                        style={{ fontSize: '13px', color: 'black' }}
                         value={dropdownFormData.message}
                         onChange={(e) => setDropdownFormData({ ...dropdownFormData, message: e.target.value })}
                       ></textarea>
@@ -255,7 +255,7 @@ export default function LandingPage() {
                   type="text"
                   id="name"
                   placeholder="Enter your full name"
-                  style={{ fontSize: '14px' }}
+                  style={{ fontSize: '14px', color: 'black' }}
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   required
@@ -267,7 +267,7 @@ export default function LandingPage() {
                   type="email"
                   id="email"
                   placeholder="your.email@example.com"
-                  style={{ fontSize: '14px' }}
+                  style={{ fontSize: '14px', color: 'black' }}
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   required
@@ -278,7 +278,7 @@ export default function LandingPage() {
                 <textarea
                   id="message"
                   placeholder="How can we help you?"
-                  style={{ fontSize: '14px' }}
+                  style={{ fontSize: '14px', color: 'black' }}
                   value={formData.message}
                   onChange={(e) => setFormData({ ...formData, message: e.target.value })}
                   required
